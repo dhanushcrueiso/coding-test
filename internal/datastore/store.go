@@ -1,9 +1,10 @@
 package datastore
 
 import (
-	"CODING-TEST/internal/store"
 	"fmt"
 	"time"
+
+	"github.com/dhanushcrueiso/coding-test/internal/store"
 )
 
 type repo struct {

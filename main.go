@@ -1,9 +1,9 @@
 package main
 
 import (
-	"CODING-TEST/src/router"
+	"github.com/dhanushcrueiso/coding-test/src/router"
 
-	"CODING-TEST/internal/db"
+	"github.com/dhanushcrueiso/coding-test/internal/db"
 
 	"github.com/gofiber/fiber/v2"
 )

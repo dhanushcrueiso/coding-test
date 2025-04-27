@@ -1,4 +1,4 @@
-module CODING-TEST
+module github.com/dhanushcrueiso/coding-test
 
 go 1.23.3
 

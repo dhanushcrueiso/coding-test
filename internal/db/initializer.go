@@ -1,8 +1,8 @@
 package db
 
 import (
-	"CODING-TEST/internal/datastore"
-	"CODING-TEST/internal/store"
+	"github.com/dhanushcrueiso/coding-test/internal/datastore"
+	"github.com/dhanushcrueiso/coding-test/internal/store"
 )
 
 var DataSvc datastore.Service = nil
