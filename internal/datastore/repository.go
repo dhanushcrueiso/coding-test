@@ -1,8 +1,9 @@
 package datastore
 
 import (
-	"CODING-TEST/internal/store"
 	"time"
+
+	"github.com/dhanushcrueiso/coding-test/internal/store"
 )
 
 type Repository interface {

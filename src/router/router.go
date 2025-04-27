@@ -1,7 +1,7 @@
 package router
 
 import (
-	"CODING-TEST/src/handlers"
+	"github.com/dhanushcrueiso/coding-test/src/handlers"
 
 	"github.com/gofiber/fiber/v2"
 )

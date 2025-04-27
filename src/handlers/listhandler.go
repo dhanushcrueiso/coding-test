@@ -1,9 +1,10 @@
 package handlers
 
 import (
-	"CODING-TEST/internal/db"
 	"strconv"
 	"time"
+
+	"github.com/dhanushcrueiso/coding-test/internal/db"
 
 	"github.com/gofiber/fiber/v2"
 )

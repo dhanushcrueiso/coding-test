@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"CODING-TEST/internal/db"
+	"github.com/dhanushcrueiso/coding-test/internal/db"
 
 	"github.com/gofiber/fiber/v2"
 )
