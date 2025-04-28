@@ -21,17 +21,18 @@ func (h *Handler) GetTtlData(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"message": "TTL set successfully",
-		"data":    ttl,
+		"data":    ttl.Seconds(),
 	})
 }
 
 func (h *Handler) SetTtlData(c *fiber.Ctx) error {
 	key := c.Params("key")
 	ttlStr := c.Query("ttl")
-	if ttlStr != "" {
+	if ttlStr == "" {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "invalid ttl value"})
 	}
+
 	ttlSeconds, err := strconv.Atoi(ttlStr)
 	if err != nil || ttlSeconds < 0 {
 		return c.Status(400).JSON(fiber.Map{

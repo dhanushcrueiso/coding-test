@@ -39,8 +39,8 @@ func (r *repo) Set(key string, item string, ttl *time.Duration) error {
 }
 
 func (r *repo) Get(key string) (interface{}, store.DataType, bool) {
-	r.Items.Mu.RLock()
-	defer r.Items.Mu.RUnlock()
+	r.Items.Mu.Lock()
+	defer r.Items.Mu.Unlock()
 
 	item, found := r.Items.Data.Data[key]
 	if !found {
@@ -48,10 +48,9 @@ func (r *repo) Get(key string) (interface{}, store.DataType, bool) {
 	}
 
 	if item.IsExpired() {
-		go r.Remove(key) // remove if the item is expired
+		delete(r.Items.Data.Data, key)
 		return nil, 0, false
 	}
-
 	return item.Value, item.Type, true
 }
 
@@ -99,7 +98,8 @@ func (r *repo) GetTTL(key string) (time.Duration, bool) {
 
 	remaining := time.Until(item.ExpiresAt)
 	if remaining < 0 {
-		go r.Remove(key) // Schedule for removal
+		// Remove synchronously instead of in a goroutine
+		delete(r.Items.Data.Data, key)
 		return 0, false
 	}
 

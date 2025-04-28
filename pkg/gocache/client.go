@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -32,9 +34,16 @@ type responseBody struct {
 	Error   string          `json:"error,omitempty"`
 }
 
+type dataBody struct {
+	Key   string      `json:"key"`
+	Type  int         `json:"type"`
+	Value interface{} `json:"value"`
+	// Add any other fields that Fiber might include
+}
+
 // Get retrieves a string value by key
 func (c *Client) Get(key string) (string, error) {
-	url := fmt.Sprintf("%s/string/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/strings/%s", c.BaseURL, key)
 	resp, err := c.client.Get(url)
 	if err != nil {
 		return "", err
@@ -42,26 +51,31 @@ func (c *Client) Get(key string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", c.parseError(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("server returned status %d: %s",
+			resp.StatusCode, string(bodyBytes))
 	}
 
-	response, err := c.parseResponse(resp.Body)
-	if err != nil {
-		return "", err
+	// Parse the response
+	var response dataBody
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("error parsing response: %w (body: %s)",
+			err, string(bodyBytes))
 	}
 
-	var result string
-	err = json.Unmarshal(response.Data, &result)
-	if err != nil {
-		return "", fmt.Errorf("error parsing response data: %w", err)
+	// Convert the value to string
+	value, ok := response.Value.(string)
+	if !ok {
+		return "", fmt.Errorf("expected string value, got: %T", response.Value)
 	}
 
-	return result, nil
+	return value, nil
 }
 
 // Set sets a string value with optional TTL
 func (c *Client) Set(key, value string, ttl time.Duration) error {
-	url := fmt.Sprintf("%s/string/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/strings/%s", c.BaseURL, key)
 	if ttl > 0 {
 		url = fmt.Sprintf("%s?ttl=%d", url, int(ttl.Seconds()))
 	}
@@ -98,7 +112,7 @@ func (c *Client) Set(key, value string, ttl time.Duration) error {
 
 // Update updates an existing string value
 func (c *Client) Update(key, value string) error {
-	url := fmt.Sprintf("%s/string/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/strings/%s", c.BaseURL, key)
 
 	data := struct {
 		Value string `json:"value"`
@@ -132,7 +146,7 @@ func (c *Client) Update(key, value string) error {
 
 // Remove deletes a key
 func (c *Client) Remove(key string) error {
-	url := fmt.Sprintf("%s/string/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/strings/%s", c.BaseURL, key)
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -154,7 +168,7 @@ func (c *Client) Remove(key string) error {
 
 // CreateList initializes a new list with optional TTL
 func (c *Client) CreateList(key string, ttl time.Duration) error {
-	url := fmt.Sprintf("%s/list/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/list/%s", c.BaseURL, key)
 	if ttl > 0 {
 		url = fmt.Sprintf("%s?ttl=%d", url, int(ttl.Seconds()))
 	}
@@ -179,7 +193,7 @@ func (c *Client) CreateList(key string, ttl time.Duration) error {
 
 // GetList retrieves all items in a list
 func (c *Client) GetList(key string) ([]string, error) {
-	url := fmt.Sprintf("%s/list/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/list/%s", c.BaseURL, key)
 
 	resp, err := c.client.Get(url)
 	if err != nil {
@@ -207,7 +221,7 @@ func (c *Client) GetList(key string) ([]string, error) {
 
 // Push adds a value to the end of a list
 func (c *Client) Push(key, value string) error {
-	url := fmt.Sprintf("%s/list/%s/push", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/list/%s/push", c.BaseURL, key)
 
 	data := struct {
 		Value string `json:"value"`
@@ -241,7 +255,7 @@ func (c *Client) Push(key, value string) error {
 
 // Pop removes and returns the last value from a list
 func (c *Client) Pop(key string) (string, error) {
-	url := fmt.Sprintf("%s/list/%s/pop", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/list/%s/pop", c.BaseURL, key)
 
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -274,7 +288,7 @@ func (c *Client) Pop(key string) (string, error) {
 
 // RemoveList deletes a list
 func (c *Client) RemoveList(key string) error {
-	url := fmt.Sprintf("%s/list/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/list/%s", c.BaseURL, key)
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -296,54 +310,87 @@ func (c *Client) RemoveList(key string) error {
 
 // GetTTL returns the remaining TTL for a key
 func (c *Client) GetTTL(key string) (time.Duration, error) {
-	url := fmt.Sprintf("%s/ttl/%s", c.BaseURL, key)
+	url := fmt.Sprintf("%s/api/ttl/%s", c.BaseURL, key)
 
 	resp, err := c.client.Get(url)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("error reading response: %w", err)
+	}
+
+	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, c.parseError(resp.Body)
+		return 0, fmt.Errorf("server returned error (status %d): %s",
+			resp.StatusCode, string(bodyBytes))
 	}
 
-	response, err := c.parseResponse(resp.Body)
-	if err != nil {
-		return 0, err
+	// Parse the response
+	var response struct {
+		Message string  `json:"message"`
+		Data    float64 `json:"data"`
 	}
 
-	var ttlSeconds int64
-	err = json.Unmarshal(response.Data, &ttlSeconds)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing response data: %w", err)
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		return 0, fmt.Errorf("error parsing response: %w", err)
 	}
 
-	if ttlSeconds < 0 {
+	// Check for negative value indicating no expiration
+	if response.Data < 0 {
 		return -1, nil // No expiration
 	}
 
-	return time.Duration(ttlSeconds) * time.Second, nil
+	// Convert seconds to duration
+	return time.Duration(response.Data * float64(time.Second)), nil
 }
 
 // SetTTL sets or updates the TTL for a key
 func (c *Client) SetTTL(key string, ttl time.Duration) error {
 	ttlSeconds := int(ttl.Seconds())
-	url := fmt.Sprintf("%s/ttl/%s?ttl=%d", c.BaseURL, key, ttlSeconds)
 
-	req, err := http.NewRequest("POST", url, nil)
+	// Build URL with properly encoded query parameter
+	baseURL := fmt.Sprintf("%s/api/ttl/%s", c.BaseURL, key)
+	reqURL, err := url.Parse(baseURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing URL: %w", err)
 	}
 
+	// Add query parameters
+	query := reqURL.Query()
+	query.Set("ttl", strconv.Itoa(ttlSeconds))
+	reqURL.RawQuery = query.Encode()
+
+	// Create request
+	req, err := http.NewRequest(http.MethodPost, reqURL.String(), nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Set content type
+	req.Header.Set("Content-Type", "application/json")
+
+	// Execute request
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response: %w", err)
+	}
+
+	// Check if successful
 	if resp.StatusCode != http.StatusOK {
-		return c.parseError(resp.Body)
+		return fmt.Errorf("server returned error (status %d): %s",
+			resp.StatusCode, string(bodyBytes))
 	}
 
 	return nil
