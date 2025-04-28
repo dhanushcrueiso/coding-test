@@ -77,12 +77,33 @@ func (s *DataObj) cleanExpired() {
 	defer s.Mu.Unlock()
 
 	now := time.Now()
+	fmt.Printf("Starting cleanup at %v, checking %d keys\n", now, len(s.Data.Data))
+
+	// Create a separate list of keys to delete to avoid map modification during iteration
+	keysToDelete := []string{}
+
 	for k, v := range s.Data.Data {
 		if !v.ExpiresAt.IsZero() && now.After(v.ExpiresAt) {
-			fmt.Println("deleting the key", k, v)
-			delete(s.Data.Data, k)
+			fmt.Printf("Key expired: '%s' (expires: %v, now: %v)\n", k, v.ExpiresAt, now)
+			keysToDelete = append(keysToDelete, k)
 		}
 	}
+
+	// Now perform the actual deletion
+	for _, k := range keysToDelete {
+		fmt.Printf("Deleting key: '%s'\n", k)
+		delete(s.Data.Data, k)
+
+		// Verify deletion
+		if _, stillExists := s.Data.Data[k]; stillExists {
+			fmt.Printf("ERROR: Key '%s' still exists after deletion!\n", k)
+		} else {
+			fmt.Printf("Successfully deleted key: '%s'\n", k)
+		}
+	}
+
+	fmt.Printf("Cleanup complete: %d keys deleted, %d keys remaining\n",
+		len(keysToDelete), len(s.Data.Data))
 }
 
 func (s *DataObj) Stop() {
