@@ -6,12 +6,12 @@
 2. Check if docker is installed in local and working
 3. Pull the docker image which is hosted in docker repository using this command:
    ```bash
-   docker pull dhanushcrueiso/acronis-redis:v0.1.2
+   docker pull dhanushcrueiso/acronis-redis:v0.1.3
    ```
 
 4. Then to run and bind the ports to 3001 run the below command:
    ```bash
-   docker run -d -p 3001:3000 --name acronis-redis dhanushcrueiso/acronis-redis:v0.1.2
+   docker run -d -p 3001:3000 --name acronis-redis dhanushcrueiso/acronis-redis:v0.1.3
    ```
 
 5. In another repo get the client library using:
