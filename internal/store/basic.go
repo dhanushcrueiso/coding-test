@@ -52,7 +52,7 @@ func NewRedisMemoryStore() *DataObj {
 		StopCh: make(chan bool),
 	}
 
-	s.Timer = time.NewTicker(time.Second * 30)
+	s.Timer = time.NewTicker(time.Second * 5)
 	go s.runCleanUp()
 
 	return s
@@ -172,6 +172,9 @@ func (s *DataObj) Update(key string, value string) bool {
 }
 
 func (s *DataObj) GetTTL(key string) (time.Duration, bool) {
+
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
 	fmt.Println("Current keys in map:")
 	for k := range s.Data.Data {
 		fmt.Printf("  '%s' (bytes: %x)\n", k, []byte(k))
@@ -180,9 +183,6 @@ func (s *DataObj) GetTTL(key string) (time.Duration, bool) {
 	keyCopy := defensiveCopy(key)
 
 	fmt.Printf("GetTTL called with key: '%s' (bytes: %x)\n", keyCopy, []byte(keyCopy))
-
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
 
 	// Debug: print all keys
 	fmt.Println("Current keys in map:")
