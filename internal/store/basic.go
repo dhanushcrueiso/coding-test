@@ -290,13 +290,7 @@ func (s *DataObj) Push(key string, value string) bool {
 
 	item, exists := s.Data.Data[key]
 	if !exists || item.IsExpired() {
-		// Create the list if it doesn't exist
-		s.Data.Data[key] = &Item{
-			Type:      ListType,
-			Value:     []string{value},
-			ExpiresAt: time.Time{}, // No expiration by default
-		}
-		return true
+		return false
 	}
 
 	if item.Type != ListType {

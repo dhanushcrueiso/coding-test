@@ -41,6 +41,11 @@ type dataBody struct {
 	// Add any other fields that Fiber might include
 }
 
+type dataresponselist struct {
+	Data    string `json:"value"`
+	Message string `json:"messsage"`
+}
+
 // Get retrieves a string value by key
 func (c *Client) Get(key string) (string, error) {
 	url := fmt.Sprintf("%s/api/strings/%s", c.BaseURL, key)
@@ -197,23 +202,48 @@ func (c *Client) GetList(key string) ([]string, error) {
 
 	resp, err := c.client.Get(url)
 	if err != nil {
+		fmt.Println("check oje")
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		fmt.Println("check two")
 		return nil, c.parseError(resp.Body)
 	}
 
-	response, err := c.parseResponse(resp.Body)
+	// Parse the response
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
+	// Parse the Fiber response directly first
+	var fiberResponse struct {
+		Data    json.RawMessage `json:"data"`
+		Message string          `json:"message"`
+	}
+
+	if err := json.Unmarshal(bodyBytes, &fiberResponse); err != nil {
+		// If direct parsing fails, fall back to parseResponse
+		resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+		response, err := c.parseResponse(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var result []string
+		if err := json.Unmarshal(response.Data, &result); err != nil {
+			return nil, fmt.Errorf("error parsing response data: %w", err)
+		}
+
+		return result, nil
+	}
+
+	// If direct parsing succeeded, handle the data field
 	var result []string
-	err = json.Unmarshal(response.Data, &result)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response data: %w", err)
+	if err := json.Unmarshal(fiberResponse.Data, &result); err != nil {
+		return nil, fmt.Errorf("error parsing data array: %w", err)
 	}
 
 	return result, nil
@@ -234,7 +264,7 @@ func (c *Client) Push(key, value string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
@@ -253,37 +283,55 @@ func (c *Client) Push(key, value string) error {
 	return nil
 }
 
+type PopResponse struct {
+	Data    string `json:"data"`    // The popped string value
+	Message string `json:"message"` // Success message
+}
+
 // Pop removes and returns the last value from a list
 func (c *Client) Pop(key string) (string, error) {
 	url := fmt.Sprintf("%s/api/list/%s/pop", c.BaseURL, key)
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("PATCH", url, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error creating request: %w", err)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read the response body
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Log the raw response for debugging
+	fmt.Printf("Pop response: %s\n", string(bodyBytes))
+
 	if resp.StatusCode != http.StatusOK {
+		// Create a new reader for the parseError function
+		resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		return "", c.parseError(resp.Body)
 	}
 
-	response, err := c.parseResponse(resp.Body)
-	if err != nil {
-		return "", err
+	// Parse the response into our structure
+	var popResponse PopResponse
+	if err := json.Unmarshal(bodyBytes, &popResponse); err != nil {
+		return "", fmt.Errorf("error parsing response: %w (body: %s)",
+			err, string(bodyBytes))
 	}
 
-	var result string
-	err = json.Unmarshal(response.Data, &result)
-	if err != nil {
-		return "", fmt.Errorf("error parsing response data: %w", err)
+	// Check if we got a valid string value
+	if popResponse.Data == "" {
+		// Some APIs might return null/empty on an empty list
+		return "", fmt.Errorf("list is empty or returned empty value")
 	}
 
-	return result, nil
+	return popResponse.Data, nil
 }
 
 // RemoveList deletes a list
