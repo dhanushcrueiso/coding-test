@@ -4,14 +4,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dhanushcrueiso/coding-test/internal/db"
-
 	"github.com/gofiber/fiber/v2"
 )
 
 func (h *Handler) GetListData(c *fiber.Ctx) error {
 	key := c.Params("key")
-	data, err := db.DataSvc.GetList(key)
+	data, err := h.store.GetList(key)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to get list data",
@@ -36,7 +34,7 @@ func (h *Handler) SetListData(c *fiber.Ctx) error {
 		ttl = time.Duration(ttlSeconds) * time.Second
 	}
 
-	if db.DataSvc.CreateList(key, ttl) {
+	if h.store.CreateList(key, ttl) {
 		return c.Status(200).JSON(fiber.Map{
 			"message": "List created successfully"})
 	} else {
@@ -47,7 +45,7 @@ func (h *Handler) SetListData(c *fiber.Ctx) error {
 
 func (h *Handler) DeleteListData(c *fiber.Ctx) error {
 	key := c.Params("key")
-	if db.DataSvc.Remove(key) {
+	if h.store.Remove(key) {
 		return c.Status(200).JSON(fiber.Map{
 			"message": "List deleted successfully"})
 	} else {
@@ -71,7 +69,7 @@ func (h *Handler) UpdateListData(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{
 				"error": "invalid request body"})
 		}
-		if db.DataSvc.Push(key, data.Value) {
+		if h.store.Push(key, data.Value) {
 			return c.Status(200).JSON(fiber.Map{
 				"message": "added to list successfully"})
 		} else {
@@ -80,7 +78,7 @@ func (h *Handler) UpdateListData(c *fiber.Ctx) error {
 		}
 
 	} else {
-		value, success := db.DataSvc.Pop(key)
+		value, success := h.store.Pop(key)
 		if !success {
 			return c.Status(400).JSON(fiber.Map{
 				"error": "Failed to pop from list or key not found"})

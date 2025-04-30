@@ -8,7 +8,7 @@ import (
 
 func MountRoutes(app *fiber.App) {
 	apiGroup := app.Group("/api")
-	controller := handlers.Handler{}
+	controller := handlers.NewServer()
 	apiGroup.Get("/health", controller.GetHealth)
 	stringsGroup := apiGroup.Group("/strings")
 	{

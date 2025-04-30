@@ -5,12 +5,21 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dhanushcrueiso/coding-test/internal/db"
+	"github.com/dhanushcrueiso/coding-test/internal/store"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-type Handler struct{}
+type Handler struct {
+	store *store.DataObj
+}
+
+// NewServer creates a new HTTP server with the store
+func NewServer() *Handler {
+	return &Handler{
+		store: store.NewRedisMemoryStore(),
+	}
+}
 
 func (h *Handler) GetHealth(c *fiber.Ctx) error {
 
@@ -44,7 +53,7 @@ func (h *Handler) SetStringData(c *fiber.Ctx) error {
 			"error": "invalid request body"})
 	}
 	fmt.Println(ttl)
-	err := db.DataSvc.Set(c.Params("key"), data.Value, &ttl)
+	err := h.store.Set(c.Params("key"), data.Value, &ttl)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "failed to set data"})
@@ -59,7 +68,7 @@ func (h *Handler) GetStringData(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "key is required"})
 	}
-	value, dataType, found := db.DataSvc.Get(key)
+	value, dataType, found := h.store.Get(key)
 	if !found {
 		return c.Status(404).JSON(fiber.Map{
 			"error": "data not found"})
@@ -86,7 +95,7 @@ func (h *Handler) UpdateStringData(c *fiber.Ctx) error {
 			"error": "invalid request body"})
 	}
 
-	if db.DataSvc.Update(key, data.Value) {
+	if h.store.Update(key, data.Value) {
 		return c.Status(200).JSON(fiber.Map{
 			"message": "data updated successfully"})
 	} else {
@@ -102,7 +111,7 @@ func (h *Handler) DeleteStringData(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "key is required"})
 	}
-	if db.DataSvc.Remove(key) {
+	if h.store.Remove(key) {
 		return c.Status(200).JSON(fiber.Map{
 			"message": "data deleted successfully"})
 	} else {
