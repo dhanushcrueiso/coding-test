@@ -11,8 +11,8 @@ func (h *Handler) GetListData(c *fiber.Ctx) error {
 	key := c.Params("key")
 	data, err := h.store.GetList(key)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get list data",
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Data Not found",
 		})
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -83,7 +83,6 @@ func (h *Handler) UpdateListData(c *fiber.Ctx) error {
 			return c.Status(400).JSON(fiber.Map{
 				"error": "Failed to pop from list or key not found"})
 		}
-
 		return c.Status(200).JSON(fiber.Map{
 			"message": "Popped from list successfully",
 			"data":    value})
